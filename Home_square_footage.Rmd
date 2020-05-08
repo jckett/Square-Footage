@@ -1,0 +1,164 @@
+---
+title: "Assignment 6.1 Student Survey"
+author: "Joi Chu-Ketterer"
+date: "July 8th 2019"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r, include=FALSE}
+library(readxl)
+library(QuantPsyc)
+library(car)
+```
+
+```{r}
+housing <- read_excel("housing.xlsx")
+
+price_area <- lm(`Sale Price` ~ sq_ft_lot, data = housing)
+price_str<- lm(`Sale Price` ~ sq_ft_lot + bath_full_count + bath_3qtr_count + bath_half_count, data = housing)
+```
+While the first variable price_area looks at the relationship between a unit size and its price, I wanted to explore how the breakup of the space, specifically the bathroom count, affected the price. Is it possible between two units similar in square feet could differ on price solely on the difference in bathroom types? 
+
+```{r}
+summary(price_area)
+summary(price_str)
+```
+
+Just as the equation for $R^2$ and ${{R_{adj}}^{2}$ show, they have an inverse relationship of sorts but are dependent upon the predictors you are adding into the equation:
+
+${R_{adj}}^{2} = 1 - [{\frac{({1-{R}^{2})}{(n - 1})}{n - k -1}}]$
+
+For instance, suppose you add a bunch of independent predictors ($k$) that fit the model well, then $k$ would increase, but so would $R^2$, and thus ${{R_{adj}}^{2}$ would increase or there wouldn't be a large difference between $R^2$ and ${{R_{adj}}^{2}$. Conversely, if the $k$ independent predictors you included poorly fit the model, $R^2$ would not change at all and the increase in $k$ would cause ${{R_{adj}}^{2}$ to decrease. 
+
+Knowing this, let's look at the $R^2$ and ${{R_{adj}}^{2}$ values of our two variables price_area and price_str. 
+
+price_area has a $R^2$ value of 0.01435 and a ${{R_{adj}}^{2}$ of 0.01428
+price_str has a $R^2$ value of 0.1364 and a ${{R_{adj}}^{2}$ of 0.1361
+
+Both of the variables only experienced a slight decrease from $R^2$ to ${{R_{adj}}^{2}$ indicating that a unit's square foot and bathroom styles are good factors to take into consideration for the unit price. Additionally, the $R^2$ for the bathroom breakdown is greater than for the square foot, suggesting that the type of bathrooms a unit has actually has a greater impact than the size of the unit, which can account for variations in sale price. 
+
+```{r}
+lm.beta(price_str)
+```
+
+From the above results, we see that the following beta coefficients are:
+- sq_ft_lot: 0.09017003
+- bath_full_count: 0.3301412
+- bath_3qtr_count: 0.2117381
+- bath_half_count: 0.1609598
+
+These estimates are an indication of how many standard deviations a resulting value will differ given one standard deviation change of the predictor itself. Since all units are in standard deviation now, the beta coefficient is a better measure of importance, or impact, of a predictor. Beta coefficients can be positive, zero, or negative. In our example, all of them are positive, so our predictors have a positive relationship with sales price. The bath_full_count predictor has the highest beta coefficient, which indicates an increase in standard deviation for bath_full_count will increase a unit's sale price by 33.0%. The smallest impact on sales price is surprisingly the sq_ft_lot, which with an increase of one standard deviation would only result in an 12.0% increase in sale price. 
+
+```{r}
+confint(price_str)
+```
+
+For confidence levels, the important points to note are if the interval crosses over zero and the magnitude of the interval. An interval that crosses zero represents a very poor model. Simiarly, the larger the interval, the less representative the predictor is of the outcome, in otherwords the less impact it has. When calculating the beta coefficient, we saw that bath_full_count has the highest value, so we would expect it to have the smallest interval. As we predicted, it does have the smallest interval of the three bathroom sizes. 
+
+```{r}
+anova(price_area, price_str)
+```
+
+ANOVA tests are a great way to compare models, but it should be noted that anova can only compare hierarchical models. This means that each additional model we want to compare must contain all the same predictors in the previously added model. This way, it truly is a comparison of the impact any additional predictors has on the performance of a model. 
+
+Looking at the results from the ANOVA test, we see that $F$ value is 605.56, while the $ Pr(>F)$ value is 2.2e-16. Using this information and the Sigfnif. code, we know that our price_str model has a $F$-value of 605.56, and a $p$-value of less than .001. Since the $F$-value is so great, and $p$ is significant, we can confidently say our second model is an improvement upon from our first model, which only looked at unit size. 
+
+```{r}
+housing$outlier <- rstandard(price_str)
+housing$influential <- cooks.distance(price_str)
+write.table(housing, "housing.xlsx")
+housing
+```
+
+```{r}
+housing$large_resid <- housing$outlier > 2 | housing$outlier < -2
+```
+
+```{r}
+sum(housing$large_resid)
+nrow(housing)
+```
+Here, we can see that only 315 out of 12865 cases have large residuals. 
+
+```{r}
+housing[housing$large_resid,c("sq_ft_lot", "bath_full_count", "bath_3qtr_count",  "bath_half_count", "outlier")]
+```
+
+```{r}
+housing$leverage <- hatvalues(price_str)
+housing$cov_ratio <- covratio(price_str)
+
+housing[housing$large_resid, c("influential", "leverage", "cov_ratio")]
+```
+
+Again, we are only looking at the cases that have large residuals, so 315 cases. Only one case has an cooks.distance value of greater than 1, and several close to 1, which means it has a considerable impact on the model. When looking it up, this case refers to a 89734 square foot unit that supposedly has 23 full bathrooms and 1 half bathroom. This seems like someone made a typo while entering data, so this would definitely be something to contact the data owner about if possible. 
+
+To understand which cases have a significant leverage value, we need to calculate the average leverage (hat value): 
+
+$\frac{k + 1}{n}$ , where $k$ is 4 since we have four variables we are comparing, $n$ is 12865 as that is how many cases we have (sample size), which comes out to 0.000388651. And according to Stevens, we are only concerned with entries that are greater than three times the average leverage, which is roughly 0.0012. 
+
+```{r}
+sum(housing$leverage > 0.0012 )
+```
+
+This means there are 362 cases that are greater than three times the average. While this is a good indication of which cases could have a large impact on the data, it's not a completely accurate assumption as the leverage is calculated on the model outcome rather than the individual predictors.
+
+Lastly, we will look at the covariance ratio, so we are looking for cases between $1-[\frac{3(k + 1)}{n}]$ and $1+[\frac{3(k + 1)}{n}]$, which is roughly between 0.999 and 1.001
+
+```{r}
+sum(housing$cov_ratio > 1.001 | housing$cov_ratio < 0.999)
+```
+
+This means there are 1006 cases that lie beyond our covariance ratio boundaries. Quickly looking at the first ten rows of the cases, we already see the same case that had 23 bathrooms also has an alarming leverage and covariance ratio value. Most times if one of the three values is slightly off, we can look at the other variables to see if they are reasonable, but when all three are out of bounds you know it's definitely a data point you want to investigate. 
+
+We can evaluate the assumption of independence of our model using the Durbin-Watson test:
+
+```{r}
+durbinWatsonTest(price_str)
+```
+
+The analysis shows a Durbin-Watson statistic of 0.655, which is less than 1 and would be considered a point of alarm. This paired with a p-value of 0.0 is another strong indication that our assumption of independence has not been met, which means the variables I chose to analyze are very much dependent upon each other. This seems logical since a unit with multiple full bathrooms may not have a half bathroom. Conversely, if a unit has a half bath it's very likely it will have a full bath as well since most units won't have just a singular half bath. 
+
+We can assess the assumption of no multicollinearity by using the variance inflation factor and tolerance, where tolerance is the inverse of VIF. To arrive at any conclusion though, we will need to compare these values to the average VIF.
+
+```{r}
+mean(vif(price_str))
+vif(price_str)
+1/vif(price_str)
+```
+
+Multicollinearity inidates when there is a strong correlation between two or more of the variables in a model. For an ideal model that is able to distinguish the different impacts of each variable, we would hope for the variables to be noncollinear of each other. Ideally, we want a VIF value of around 1 and tolerance value above 0.2. 
+
+From the data above, we can see that most of our VIF values are around 1, and all of our tolerances are well above 0.2, which indicates the variables I chose to analyze don't have a strong linear relationship with each other. If the VIF mean is greater than 1, that can indicate the multicollinearity of the variables may introduce bias into the mode. Looking at our VIF mean of 1.15 shows that it is possible, but with the low VIF values any introduced bias is not significant. 
+
+```{r}
+plot(price_str)
+
+```
+
+When we use the plot() function, we get four graphs. The first graph plots the residuals against the fitted values. Based on the pattern of this plot, which sort of looks like an upside triangle, indicating heteroscedasticity. This supports our earlier findings when we found the assumption of independence was not met. 
+
+The second graph, Q-Q plot, shows the deviations from normality. Since the graph shows a relatively good chunk of the data lies on the Q-Q plot line, its safe to say our data is relatively normal. However, the clump of the data between the  3rd and 4th quantile may skew the distribution. 
+
+The third graph, scale-location, tests for equal variance across all predictors, or homoscedasticity. Spread out data points would indicate homoscedasticity, so it makes sense that all my data points are clustered together, as we found in the first plot that there is heteroscedasticity. 
+
+The fourth graph, residuals vs leverage, helps pinpoint specific cases that have a large impact on the model. Here, we are not looking at the spread of the data points, but rather the location on the plot, specifically the upper right corner and lower right corner as these locations indicate the data points would be outside of the Cook's distance. From earlier, we found that there were cases outside of Cook's distance, which is supported by the various data points to the right side of the plot. 
+
+In addition to the plot() function, we can look at the distribution of the our data using the hist() function. We will used studentized residuals for this histogram as that function outputs the residals in standard deviation units. 
+
+```{r}
+hist(rstudent(price_str))
+```
+
+Despite there not being a lot of data points, you can still make out that the distribution is left-skewed, just as our Q-Q plot indicated our data would be. 
+
+All of the tests and plots we created/ran are an indication of the bias in a model. This some of the predictors included in our model are affecting the fit of it. We know this is the case for the following reasons:
+- all the VIF values for our predictors were above 1
+- the histogram is left-skewed opposed to being normally distributed
+- the residuals vs. fitted plot indicates heteroscedasticity
+- the Cook's distance plot shows data points outside of Cook's distance, which means there are certain data points that are influencing the model much more than other data points
+- our assumption of independence is violated
+
+Despite the bias that we have seen the model holds, it's not to say it's a poor model. From earlier calculations we saw a large $F$-value and significant $p$-value, which indicates a huge improvement in model compared to the model that only looked at the unit size predictor. Additionally, we did see that bathroom type (full, half, 3qrt) had about three times the impact on unit sale price than the unit size, which means it is an important predictor to take into consideration. Since including the bathroom predictors improved the model, but also introduced bias, I would guess that means there is another predictor in our original data set that should be included that could offset the bathroom predictor's bias. Additionally, since the full bath predictor had the most impact, I would remove the other bathroom predictors (half, 3qrt) to swap it out for the new one. Overall, it is an adequate model and would certainly give any realtor a good indication of how to price new properties entering the market. 
