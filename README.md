@@ -4,7 +4,7 @@ This project predicts the cost of a home based on square footage and basic housi
 
 ## Technologies
 
-Completed in Python, the following packages are used
+Completed in R, the following packages are used
  - readxl
  - QuantPsyc
  - car
