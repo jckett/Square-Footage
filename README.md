@@ -1,6 +1,10 @@
-# Home Square Footage Rates
+# Understanding Home Rates Predicors Through Modeling
 
-This project predicts the cost of a home based on square footage and basic housing amenities. 
+Ever wonder how the size and bathroom count of your home could be affecting its market value? This project looks at understanding how square footage and basic home amenities (number of bathrooms) could affect the sale price of a home. 
+
+## The Data
+
+The data was directly provided, but can be found [here](https://github.com/jckett/Square_Footage/blob/master/housing.xlsx).
 
 ## Technologies
 
